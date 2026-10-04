@@ -15,7 +15,7 @@ from telegram.ext import (
 # =========================
 # CONFIG
 # =========================
-BOT_TOKEN = "898431164:AAEa0Fj38eh_wZvmVBPAlgM0eAlK5KcBH8c"
+BOT_TOKEN = "8984311646:AAGxSxN6yiD2TXKv9M0gogQEebH9oQVa7D8"
 
 # Các domain chỉ là ví dụ để nhận diện.
 # Bot KHÔNG bypass CAPTCHA/quảng cáo/nhiệm vụ.
