@@ -1,2 +1,2 @@
-python-telegram-bot
-httpx
+python-telegram-bot>=22,<23
+playwright>=1.50,<2
