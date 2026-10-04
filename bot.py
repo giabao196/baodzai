@@ -1,6 +1,10 @@
 import os
-import re
+import asyncio
+import logging
 from urllib.parse import urlparse
+
+from aiohttp import web
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -11,384 +15,342 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
+# =========================
+# CONFIG
+# =========================
 
-# =========================================================
-# CẤU HÌNH
-# =========================================================
+BOT_TOKEN = os.getenv("8984311646:AAGxSxN6yiD2TXKv9M0gogQEebH9oQVa7D8")
+PORT = int(os.getenv("PORT", "10000"))
 
-BOT_TOKEN = os.environ["8984311646:AAGxSxN6yiD2TXKv9M0gogQEebH9oQVa7D8"]
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN chưa được cài trong Environment Variables.")
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
+
+# Các domain bot nhận diện
 SUPPORTED_DOMAINS = {
     "link4m.com",
+    "www.link4m.com",
     "yeumoney.com",
+    "www.yeumoney.com",
     "topslink.io",
+    "www.topslink.io",
     "layma.net",
+    "www.layma.net",
 }
 
-MAX_WAIT = 45
+
+# =========================
+# KEYBOARD
+# =========================
+
+def main_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔗 Vượt link", callback_data="new"),
+            InlineKeyboardButton("🌐 Domain", callback_data="domains"),
+        ],
+        [
+            InlineKeyboardButton("📖 Hướng dẫn", callback_data="help"),
+            InlineKeyboardButton("ℹ️ Trạng thái", callback_data="status"),
+        ],
+    ])
 
 
-# =========================================================
-# KIỂM TRA URL
-# =========================================================
+# =========================
+# URL
+# =========================
 
-def normalize_url(text: str):
-    text = text.strip()
-
-    if not text:
-        return None
-
-    if not re.match(r"^https?://", text, re.IGNORECASE):
-        text = "https://" + text
-
+def valid_url(url):
     try:
-        host = (urlparse(text).hostname or "").lower()
+        parsed = urlparse(url)
 
-        for domain in SUPPORTED_DOMAINS:
-            if host == domain or host.endswith("." + domain):
-                return text
+        return (
+            parsed.scheme in ("http", "https")
+            and bool(parsed.netloc)
+        )
 
     except Exception:
-        pass
-
-    return None
+        return False
 
 
-# =========================================================
-# MENU
-# =========================================================
-
-def main_menu():
-
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🔗 Vượt link",
-                callback_data="resolve"
-            ),
-            InlineKeyboardButton(
-                "📖 Hướng dẫn",
-                callback_data="help"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🌐 Domain hỗ trợ",
-                callback_data="domains"
-            ),
-            InlineKeyboardButton(
-                "⚙️ Cài đặt",
-                callback_data="settings"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "ℹ️ Trạng thái",
-                callback_data="status"
-            ),
-        ],
-    ])
+def get_domain(url):
+    try:
+        return urlparse(url).netloc.lower().split(":")[0]
+    except Exception:
+        return ""
 
 
-def result_menu():
-
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🔄 Thử lại",
-                callback_data="retry"
-            ),
-            InlineKeyboardButton(
-                "🔗 Link mới",
-                callback_data="resolve"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🏠 Menu chính",
-                callback_data="home"
-            ),
-        ],
-    ])
+def is_supported(url):
+    return get_domain(url) in SUPPORTED_DOMAINS
 
 
-# =========================================================
-# START
-# =========================================================
+# =========================
+# TELEGRAM COMMANDS
+# =========================
 
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    text = (
+        "🤖 *BOT VƯỢT LINK*\n\n"
+        "Gửi link rút gọn cho bot.\n\n"
+        "Bot sẽ mở trang bằng Chromium và theo dõi "
+        "điều hướng bình thường của trang.\n\n"
+        "⚠️ Nếu xuất hiện CAPTCHA, bạn phải tự hoàn thành. "
+        "Bot không tự giải hoặc bypass CAPTCHA."
+    )
 
     await update.message.reply_text(
-        "🤖 *LINK BOT*\n\n"
-        "Chào bạn! 👋\n\n"
-        "Gửi link cần xử lý hoặc chọn một chức năng bên dưới.\n\n"
-        "🌐 Playwright Browser\n"
-        "⚡ Async processing\n"
-        "🔄 Theo dõi chuyển hướng công khai\n\n"
-        "⚠️ CAPTCHA/anti-bot không được tự động vượt.",
+        text,
         parse_mode="Markdown",
-        reply_markup=main_menu(),
+        reply_markup=main_keyboard(),
     )
 
 
-# =========================================================
-# HELP
-# =========================================================
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-async def help_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    await update.message.reply_text(
+    text = (
         "📖 *HƯỚNG DẪN*\n\n"
-        "① Bấm 🔗 Vượt link.\n"
-        "② Gửi URL.\n"
-        "③ Bot mở URL bằng trình duyệt.\n"
-        "④ Bot chờ chuyển hướng công khai.\n"
-        "⑤ Bot trả URL hiện tại.\n\n"
-        "Bạn cũng có thể gửi URL trực tiếp mà không cần "
-        "bấm nút.\n\n"
-        "⚠️ Nếu website yêu cầu CAPTCHA/anti-bot, "
-        "bot sẽ dừng.",
+        "1️⃣ Gửi URL cho bot.\n"
+        "2️⃣ Bot mở URL bằng Chromium.\n"
+        "3️⃣ Bot chờ trang xử lý/điều hướng.\n"
+        "4️⃣ Nếu có CAPTCHA, người dùng tự xử lý.\n"
+        "5️⃣ Bot trả URL hiện tại sau khi trang điều hướng.\n\n"
+        "Bot không bypass CAPTCHA hoặc các cơ chế bảo vệ."
+    )
+
+    await update.message.reply_text(
+        text,
         parse_mode="Markdown",
-        reply_markup=main_menu(),
+        reply_markup=main_keyboard(),
     )
 
 
-# =========================================================
-# DOMAIN
-# =========================================================
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-async def show_domains(message):
-
-    domains = "\n".join(
-        f"• `{domain}`"
-        for domain in sorted(SUPPORTED_DOMAINS)
+    await update.message.reply_text(
+        "🟢 Bot đang hoạt động.\n"
+        "🌐 Chromium: OK\n"
+        "🤖 Telegram: OK\n"
+        "🔐 CAPTCHA: người dùng tự xử lý.",
+        reply_markup=main_keyboard(),
     )
 
-    await message.reply_text(
-        "🌐 *DOMAIN ĐƯỢC HỖ TRỢ*\n\n"
-        f"{domains}\n\n"
-        "Các domain khác sẽ không được xử lý.",
+
+async def domains_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    await update.message.reply_text(
+        "🌐 *DOMAIN ĐANG HỖ TRỢ*\n\n"
+        "• link4m.com\n"
+        "• yeumoney.com\n"
+        "• topslink.io\n"
+        "• layma.net",
         parse_mode="Markdown",
-        reply_markup=main_menu(),
+        reply_markup=main_keyboard(),
     )
 
 
-# =========================================================
-# SETTINGS
-# =========================================================
-
-async def show_settings(message):
-
-    await message.reply_text(
-        "⚙️ *CÀI ĐẶT BOT*\n\n"
-        "🌐 Browser: 🟢 Playwright\n"
-        "🔄 Theo dõi chuyển hướng: 🟢 Bật\n"
-        f"⏱ Thời gian chờ: `{MAX_WAIT}` giây\n"
-        "🔐 CAPTCHA bypass: 🔴 Tắt",
-        parse_mode="Markdown",
-        reply_markup=main_menu(),
-    )
-
-
-# =========================================================
-# STATUS
-# =========================================================
-
-async def show_status(message):
-
-    await message.reply_text(
-        "ℹ️ *TRẠNG THÁI BOT*\n\n"
-        "🟢 Bot: Online\n"
-        "🌐 Playwright: Enabled\n"
-        "⚡ Async: Enabled\n"
-        "🔄 Redirect tracking: Enabled\n"
-        "🔐 CAPTCHA bypass: Disabled",
-        parse_mode="Markdown",
-        reply_markup=main_menu(),
-    )
-
-
-# =========================================================
+# =========================
 # PLAYWRIGHT
-# =========================================================
+# =========================
 
-async def process_link(
-    url: str,
-    status_message
-):
+async def process_link(url):
 
-    async with async_playwright() as p:
+    async with async_playwright() as playwright:
 
-        browser = await p.chromium.launch(
+        browser = await playwright.chromium.launch(
             headless=True,
             args=[
                 "--no-sandbox",
+                "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
+                "--disable-gpu",
             ],
         )
 
-        page = await browser.new_page()
+        page = await browser.new_page(
+            viewport={
+                "width": 1280,
+                "height": 900,
+            }
+        )
 
         try:
-
-            await status_message.edit_text(
-                "🌐 *Đang mở link...*\n\n"
-                "⏳ Đang tải trang...",
-                parse_mode="Markdown",
-            )
 
             await page.goto(
                 url,
                 wait_until="domcontentloaded",
-                timeout=60000,
+                timeout=30000,
             )
 
+            # Cho JavaScript/redirect có thời gian chạy
             await page.wait_for_timeout(5000)
 
-            # -------------------------------------------------
-            # PHÁT HIỆN CAPTCHA
-            # -------------------------------------------------
+            # =========================
+            # CAPTCHA DETECTION
+            # =========================
 
-            captcha = await page.locator(
-                "iframe[src*='captcha'],"
-                "iframe[src*='recaptcha'],"
-                "iframe[src*='hcaptcha'],"
-                "[class*='captcha'],"
-                "[id*='captcha']"
-            ).count()
+            captcha_selectors = [
+                "iframe[src*='recaptcha']",
+                "iframe[src*='hcaptcha']",
+                ".g-recaptcha",
+                ".h-captcha",
+                "[data-sitekey]",
+            ]
 
-            if captcha:
+            for selector in captcha_selectors:
 
-                await status_message.edit_text(
-                    "🧩 *Phát hiện CAPTCHA / anti-bot*\n\n"
-                    "Bot không tự động vượt cơ chế bảo vệ này.\n\n"
-                    "Bạn có thể xử lý CAPTCHA thủ công rồi "
-                    "gửi lại link.",
-                    parse_mode="Markdown",
-                    reply_markup=result_menu(),
-                )
+                try:
 
-                return
+                    element = page.locator(selector).first
 
-            # -------------------------------------------------
-            # THEO DÕI URL
-            # -------------------------------------------------
+                    if await element.is_visible(timeout=500):
 
-            last_url = page.url
-            stable_count = 0
+                        return {
+                            "status": "captcha",
+                            "url": page.url,
+                        }
 
-            for _ in range(MAX_WAIT // 2):
+                except Exception:
+                    pass
 
-                await page.wait_for_timeout(2000)
+            # =========================
+            # WAIT REDIRECT
+            # =========================
 
-                current_url = page.url
+            old_url = page.url
 
-                if current_url == last_url:
+            for _ in range(15):
 
-                    stable_count += 1
+                await page.wait_for_timeout(1000)
 
-                    if stable_count >= 2:
-                        break
+                if page.url != old_url:
 
-                else:
+                    old_url = page.url
 
-                    last_url = current_url
-                    stable_count = 0
-
-            final_url = page.url
-
-            # -------------------------------------------------
-            # KẾT QUẢ
-            # -------------------------------------------------
-
-            await status_message.edit_text(
-                "✅ *ĐÃ XỬ LÝ XONG*\n\n"
-                f"🔗 `{final_url}`",
-                parse_mode="Markdown",
-                reply_markup=result_menu(),
-            )
+            return {
+                "status": "success",
+                "url": page.url,
+            }
 
         except PlaywrightTimeoutError:
 
-            await status_message.edit_text(
-                "⏱️ *HẾT THỜI GIAN CHỜ*\n\n"
-                "Website phản hồi quá lâu.\n"
-                "Hãy thử lại.",
-                parse_mode="Markdown",
-                reply_markup=result_menu(),
-            )
+            return {
+                "status": "timeout",
+                "url": page.url,
+            }
 
         except Exception as error:
 
-            await status_message.edit_text(
-                "❌ *KHÔNG XỬ LÝ ĐƯỢC*\n\n"
-                f"Lỗi: `{type(error).__name__}`",
-                parse_mode="Markdown",
-                reply_markup=result_menu(),
-            )
+            return {
+                "status": "error",
+                "url": page.url,
+                "message": str(error),
+            }
 
         finally:
 
             await browser.close()
 
 
-# =========================================================
-# NHẬN LINK
-# =========================================================
+# =========================
+# RECEIVE LINK
+# =========================
 
-async def handle_link(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def receive_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = update.message.text or ""
+    url = update.message.text.strip()
 
-    url = normalize_url(text)
-
-    if not url:
+    if not valid_url(url):
 
         await update.message.reply_text(
-            "❌ *LINK KHÔNG ĐƯỢC HỖ TRỢ*\n\n"
-            "Bot hiện hỗ trợ:\n\n"
-            "• link4m.com\n"
-            "• yeumoney.com\n"
-            "• topslink.io\n"
-            "• layma.net",
-            parse_mode="Markdown",
-            reply_markup=main_menu(),
+            "❌ Link không hợp lệ.\n\n"
+            "Ví dụ:\n"
+            "https://example.com/abc",
+            reply_markup=main_keyboard(),
         )
 
         return
 
-    # Lưu link để nút Thử lại sử dụng
-    context.user_data["last_url"] = url
+    domain = get_domain(url)
 
-    status = await update.message.reply_text(
-        "⏳ Chuẩn bị xử lý..."
+    if not is_supported(url):
+
+        await update.message.reply_text(
+            f"⚠️ Domain `{domain}` chưa nằm trong danh sách hỗ trợ.\n\n"
+            "Bot vẫn sẽ thử mở trang.",
+            parse_mode="Markdown",
+        )
+
+    message = await update.message.reply_text(
+        "⏳ Đang mở link...\n\n"
+        "🌐 Chromium đang xử lý..."
     )
 
-    await process_link(
-        url,
-        status
-    )
+    try:
+
+        result = await process_link(url)
+
+        # CAPTCHA
+        if result["status"] == "captcha":
+
+            await message.edit_text(
+                "🧩 *Phát hiện CAPTCHA*\n\n"
+                "Bot đã dừng tại đây.\n"
+                "Bạn cần tự hoàn thành CAPTCHA.",
+                parse_mode="Markdown",
+            )
+
+            return
+
+        # SUCCESS
+        if result["status"] == "success":
+
+            final_url = result["url"]
+
+            await message.edit_text(
+                "✅ *Đã xử lý xong*\n\n"
+                f"🔗 `{final_url}`",
+                parse_mode="Markdown",
+            )
+
+            return
+
+        # TIMEOUT
+        if result["status"] == "timeout":
+
+            await message.edit_text(
+                "⏱️ Trang phản hồi quá lâu.\n\n"
+                f"URL hiện tại:\n{result['url']}"
+            )
+
+            return
+
+        # ERROR
+        await message.edit_text(
+            "❌ Có lỗi khi mở trang.\n\n"
+            f"{result.get('message', 'Unknown error')}"
+        )
+
+    except Exception as error:
+
+        logging.exception("BOT ERROR")
+
+        await message.edit_text(
+            "❌ Bot gặp lỗi:\n\n"
+            f"{type(error).__name__}: {error}"
+        )
 
 
-# =========================================================
-# NÚT INLINE
-# =========================================================
+# =========================
+# BUTTONS
+# =========================
 
-async def button_handler(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
 
@@ -396,117 +358,84 @@ async def button_handler(
 
     action = query.data
 
-    # -----------------------------------------------------
-    # HOME
-    # -----------------------------------------------------
-
-    if action == "home":
+    if action == "new":
 
         await query.message.reply_text(
-            "🏠 *MENU CHÍNH*\n\n"
-            "Chọn chức năng:",
-            parse_mode="Markdown",
-            reply_markup=main_menu(),
+            "🔗 Gửi link rút gọn cần xử lý.",
+            reply_markup=main_keyboard(),
         )
 
-    # -----------------------------------------------------
-    # RESOLVE
-    # -----------------------------------------------------
-
-    elif action == "resolve":
+    elif action == "domains":
 
         await query.message.reply_text(
-            "🔗 *VƯỢT LINK*\n\n"
-            "Hãy gửi URL cần xử lý.",
-            parse_mode="Markdown",
-            reply_markup=main_menu(),
+            "🌐 Domain:\n\n"
+            "• link4m.com\n"
+            "• yeumoney.com\n"
+            "• topslink.io\n"
+            "• layma.net",
+            reply_markup=main_keyboard(),
         )
-
-    # -----------------------------------------------------
-    # RETRY
-    # -----------------------------------------------------
-
-    elif action == "retry":
-
-        url = context.user_data.get("last_url")
-
-        if not url:
-
-            await query.message.reply_text(
-                "⚠️ Chưa có link trước đó.",
-                reply_markup=main_menu(),
-            )
-
-            return
-
-        status = await query.message.reply_text(
-            "🔄 Đang thử lại..."
-        )
-
-        await process_link(
-            url,
-            status
-        )
-
-    # -----------------------------------------------------
-    # HELP
-    # -----------------------------------------------------
 
     elif action == "help":
 
         await query.message.reply_text(
-            "📖 *HƯỚNG DẪN*\n\n"
-            "Gửi link trực tiếp cho bot hoặc bấm "
-            "🔗 Vượt link.\n\n"
-            "Bot sẽ mở trang bằng Playwright và theo "
-            "dõi chuyển hướng công khai.\n\n"
-            "⚠️ CAPTCHA/anti-bot không được tự động vượt.",
-            parse_mode="Markdown",
-            reply_markup=main_menu(),
+            "📖 Gửi URL → Chromium mở trang → "
+            "nếu có CAPTCHA thì bạn tự xử lý → "
+            "bot theo dõi điều hướng.",
+            reply_markup=main_keyboard(),
         )
-
-    # -----------------------------------------------------
-    # DOMAINS
-    # -----------------------------------------------------
-
-    elif action == "domains":
-
-        await show_domains(
-            query.message
-        )
-
-    # -----------------------------------------------------
-    # SETTINGS
-    # -----------------------------------------------------
-
-    elif action == "settings":
-
-        await show_settings(
-            query.message
-        )
-
-    # -----------------------------------------------------
-    # STATUS
-    # -----------------------------------------------------
 
     elif action == "status":
 
-        await show_status(
-            query.message
+        await query.message.reply_text(
+            "🟢 Bot đang chạy.",
+            reply_markup=main_keyboard(),
         )
 
 
-# =========================================================
-# MAIN
-# =========================================================
+# =========================
+# RENDER HEALTH CHECK
+# =========================
 
-def main():
+async def health(request):
 
-    if not BOT_TOKEN:
+    return web.Response(
+        text="BOT ONLINE",
+        status=200,
+    )
 
-        raise RuntimeError(
-            "Không tìm thấy BOT_TOKEN."
-        )
+
+async def start_web_server():
+
+    app = web.Application()
+
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
+
+    runner = web.AppRunner(app)
+
+    await runner.setup()
+
+    site = web.TCPSite(
+        runner,
+        "0.0.0.0",
+        PORT,
+    )
+
+    await site.start()
+
+    logging.info(
+        f"Health server running on port {PORT}"
+    )
+
+    return runner
+
+
+# =========================
+# BOT
+# =========================
+
+async def start_bot():
 
     application = (
         Application
@@ -516,36 +445,70 @@ def main():
     )
 
     application.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
+        CommandHandler("start", start)
     )
 
     application.add_handler(
-        CommandHandler(
-            "help",
-            help_command
-        )
+        CommandHandler("help", help_command)
     )
 
     application.add_handler(
-        CallbackQueryHandler(
-            button_handler
-        )
+        CommandHandler("status", status_command)
+    )
+
+    application.add_handler(
+        CommandHandler("domains", domains_command)
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(button_handler)
     )
 
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            handle_link
+            receive_link,
         )
     )
 
-    print("🤖 Bot đang chạy...")
+    await application.initialize()
 
-    application.run_polling()
+    await application.start()
+
+    await application.updater.start_polling(
+        drop_pending_updates=True
+    )
+
+    logging.info("Telegram bot started.")
+
+    return application
+
+
+# =========================
+# MAIN
+# =========================
+
+async def main():
+
+    web_runner = await start_web_server()
+
+    bot = await start_bot()
+
+    try:
+
+        await asyncio.Event().wait()
+
+    finally:
+
+        await bot.updater.stop()
+
+        await bot.stop()
+
+        await bot.shutdown()
+
+        await web_runner.cleanup()
 
 
 if __name__ == "__main__":
-    main()
+
+    asyncio.run(main())
