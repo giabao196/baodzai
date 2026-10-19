@@ -1,3 +1,0 @@
-python-telegram-bot>=22,<23
-playwright>=1.50,<2
-aiohttp>=3.10,<4
