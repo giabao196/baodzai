@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Treo Game Giá Rẻ</title>
+<style>
+  :root {
+    --nen: #0f172a;
+    --the: #1e293b;
+    --chu: #f1f5f9;
+    --chu-phu: #94a3b8;
+    --nhan: #38bdf8;
+    --vien: #334155;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --nen: #f8fafc;
+      --the: #ffffff;
+      --chu: #0f172a;
+      --chu-phu: #475569;
+      --nhan: #0284c7;
+      --vien: #e2e8f0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--nen);
+    color: var(--chu);
+    line-height: 1.6;
+  }
+  .khung { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+  header { text-align: center; padding: 40px 0 24px; }
+  h1 { font-size: 2rem; margin: 0 0 8px; }
+  h2 { margin: 40px 0 16px; }
+  .phu { color: var(--chu-phu); }
+  .nut {
+    display: inline-block;
+    background: var(--nhan);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    margin-top: 16px;
+  }
+  .luoi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .the {
+    background: var(--the);
+    border: 1px solid var(--vien);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .the h3 { margin: 0 0 8px; }
+  .gia { font-size: 1.6rem; font-weight: 700; color: var(--nhan); }
+  ul { padding-left: 20px; margin: 8px 0 0; }
+  details {
+    background: var(--the);
+    border: 1px solid var(--vien);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+  summary { cursor: pointer; font-weight: 600; }
+  footer { text-align: center; padding: 32px 0; }
+</style>
+</head>
+<body>
+<div class="khung">
+
+  <header>
+    <h1>🎮 Treo Game Giá Rẻ</h1>
+    <p class="phu">Dịch vụ thuê treo game ổn định, hỗ trợ nhanh, giá hợp lý.</p>
+    <a class="nut" href="https://zalo.me/0347296904">Liên hệ qua Zalo</a>
+  </header>
+
+  <h2>Bảng giá</h2>
+  <div class="luoi">
+    <div class="the">
+      <h3>Gói 1 Ngày</h3>
+      <div class="gia">20.000đ <small class="phu">/ 1 ngày</small></div>
+      <ul>
+        <li>Treo liên tục 24 giờ</li>
+        <li>Phù hợp dùng thử</li>
+        <li>Hỗ trợ qua Zalo</li>
+      </ul>
+    </div>
+    <div class="the">
+      <h3>Gói 3 Ngày</h3>
+      <div class="gia">60.000đ <small class="phu">/ 3 ngày</small></div>
+      <ul>
+        <li>Treo liên tục 72 giờ</li>
+        <li>Không cần gia hạn mỗi ngày</li>
+        <li>Ưu tiên hỗ trợ</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Cách đặt dịch vụ</h2>
+  <div class="the">
+    <ol>
+      <li>Nhắn Zalo cho mình, cho biết game và gói bạn muốn.</li>
+      <li>Thanh toán theo hướng dẫn.</li>
+      <li>Nhận hướng dẫn và bắt đầu treo.</li>
+    </ol>
+  </div>
+
+  <h2>Hỏi đáp</h2>
+  <details>
+    <summary>Mình có cần đưa mật khẩu không?</summary>
+    <p>Bạn nên tự đăng nhập tài khoản của mình. Bạn không nên gửi mật khẩu qua web hay tin nhắn cho bất kỳ ai.</p>
+  </details>
+  <details>
+    <summary>Treo game có rủi ro gì không?</summary>
+    <p>Một số game cấm dùng hộ tài khoản hoặc treo tự động, có thể dẫn đến khóa tài khoản. Hãy đọc điều khoản của game trước khi đặt dịch vụ.</p>
+  </details>
+  <details>
+    <summary>Thanh toán bằng cách nào?</summary>
+    <p>Chuyển khoản ngân hàng hoặc ví điện tử. Chi tiết mình gửi qua Zalo.</p>
+  </details>
+
+  <footer class="phu">
+    <p>© 2026 Treo Game Giá Rẻ. Liên hệ: Zalo 0347296904</p>
+  </footer>
+
+</div>
+</body>
+</html>
