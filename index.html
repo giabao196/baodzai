@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1020"><title>LinkFlow — Link Checker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+<header class="top"><div class="logo">↗</div><div><div class="brand">LinkFlow</div><div class="tag">LINK CHECKER</div></div><span class="pill">GITHUB PAGES</span></header>
+<section class="hero"><div class="eyebrow"><i></i> LINK TOOL · ONLINE</div><h1>Kiểm tra <span>đường dẫn</span><br>cuối cùng</h1><p>Dán URL để kiểm tra chuyển hướng công khai. Một số dịch vụ yêu cầu xác minh hoặc backend riêng.</p></section>
+<section class="panel">
+<label for="url">LINK CẦN KIỂM TRA</label>
+<div class="inputrow"><span class="chain">↗</span><input id="url" type="url" placeholder="https://example.com/your-link" autocomplete="url"><button id="run">Kiểm tra link <b>→</b></button></div>
+<p class="hint">Hỗ trợ URL công khai. GitHub Pages không thể tự đọc mọi redirect do giới hạn CORS.</p>
+<div id="status" class="status" role="status"></div>
+<div id="result" class="result hidden"><div class="resulthead"><span>KẾT QUẢ KIỂM TRA</span><span class="ok">● XONG</span></div><div id="dest" class="dest"></div><div class="actions"><button id="copy" class="secondary">Sao chép URL</button><a id="open" class="secondary linkbtn" target="_blank" rel="noopener noreferrer">Mở link ↗</a></div></div>
+</section>
+<section class="features"><article><div class="ficon">↪</div><h3>Redirect công khai</h3><p>Kiểm tra chuyển hướng khi website cho phép trình duyệt truy cập.</p></article><article><div class="ficon">⌁</div><h3>Không lưu lịch sử</h3><p>URL không được lưu bởi giao diện này.</p></article><article><div class="ficon">⚡</div><h3>Nhẹ và miễn phí</h3><p>Chạy trên GitHub Pages, không cần cài ứng dụng.</p></article></section>
+<footer><span>LinkFlow · Link checker</span><span>Không tự vượt CAPTCHA, đăng ký hoặc xác minh bắt buộc.</span></footer>
+</main><script src="script.js"></script>
+</body></html>
