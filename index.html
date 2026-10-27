@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>CloudPhone</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <strong>☁️ CloudPhone</strong>
+      <span id="state" class="badge">checking…</span>
+    </div>
+    <button id="theme">☾</button>
+  </header>
+
+  <main>
+    <section class="card controls">
+      <div class="phone-info">
+        <div class="phone-icon">📱</div>
+        <div>
+          <h1>My Android</h1>
+          <p>Android 13 · 4 GB RAM target · 32 GB persistent volume</p>
+        </div>
+      </div>
+      <div class="buttons">
+        <button class="primary" onclick="callApi('start')">▶ Start</button>
+        <button onclick="callApi('restart')">↻ Restart</button>
+        <button class="danger" onclick="callApi('stop')">■ Stop</button>
+      </div>
+      <label class="upload">
+        Install APK
+        <input id="apk" type="file" accept=".apk">
+      </label>
+      <p id="message"></p>
+    </section>
+
+    <section class="card viewer">
+      <div class="viewer-head">
+        <strong>Android screen</strong>
+        <button onclick="openPhone()">Open full screen</button>
+      </div>
+      <div class="phone-frame">
+        <iframe id="phone" title="Android CloudPhone" src="/phone/"></iframe>
+      </div>
+      <div class="nav">
+        <button>◀ Back</button>
+        <button>● Home</button>
+        <button>▣ Recent</button>
+      </div>
+    </section>
+
+    <section class="card note">
+      <strong>How it works</strong>
+      <p>The Android VM runs on the cloud/Linux host. This iPad only displays and controls it through Safari.</p>
+    </section>
+  </main>
+
+<script>
+async function api(path, opts={}) {
+  const r = await fetch('/api/' + path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || data.error || 'Request failed');
+  return data;
+}
+async function refresh() {
+  try {
+    const d = await api('status');
+    const s = document.getElementById('state');
+    s.textContent = d.status;
+    s.className = 'badge ' + (d.status === 'running' ? 'on' : 'off');
+  } catch(e) {
+    document.getElementById('state').textContent = 'offline';
+  }
+}
+async function callApi(action) {
+  const msg = document.getElementById('message');
+  msg.textContent = 'Working…';
+  try {
+    await api(action, {method:'POST'});
+    msg.textContent = action + ' complete';
+    setTimeout(refresh, 500);
+  } catch(e) { msg.textContent = e.message; }
+}
+function openPhone() {
+  window.open('/phone/', '_blank');
+}
+document.getElementById('apk').addEventListener('change', async (e) => {
+  if (!e.target.files[0]) return;
+  const fd = new FormData();
+  fd.append('file', e.target.files[0]);
+  try {
+    await api('apk', {method:'POST', body:fd});
+    document.getElementById('message').textContent = 'APK uploaded to the server.';
+  } catch(e) { document.getElementById('message').textContent = e.message; }
+});
+document.getElementById('theme').onclick = () => document.body.classList.toggle('light');
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
